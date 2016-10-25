@@ -66,7 +66,7 @@ function readFile(path,col,fileName){
     var first_sheet_name = workbook.SheetNames[0];
     var worksheet = workbook.Sheets[first_sheet_name];
     var colorNumArr = [];
-    //计算总行数
+    //计算总行数,这儿实际上计算的是总行数*列数,不过不影响后面
     var length = 0;
     for(var z in worksheet){
         length++;
@@ -80,7 +80,7 @@ function readFile(path,col,fileName){
         tableHead.push(worksheet[z].v);
     }
     FIELD.tableHead.push(tableHead);
-
+    //console.log(length);
     //提取主题内容
     for(var i=2; i<=length; ++i){
         if(!worksheet[col+i] || !worksheet[col+i].v) continue;
