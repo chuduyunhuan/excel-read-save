@@ -73,7 +73,7 @@ function readHieraarchy(opts){
     var hotSpotArr = [];
     var workbook = XLSX.readFile(filePath);
     var hieraarchySheet = workbook.Sheets[FILED_HIERARCHY.hotSpotField];
-    for(var i=rowBegin; i<rowEnd; ++i){
+    for(var i=rowBegin; i<=rowEnd; ++i){
         if(!hieraarchySheet[col+i]) continue;
         var hotSpot = hieraarchySheet[col+i].v;
         if(!hotSpot) continue;
