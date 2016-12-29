@@ -26,6 +26,31 @@
     if(range.s.c < 10000000) ws['!ref'] = XLSX.utils.encode_range(range);
     return ws;
 }
+//对象数组去重
+Array.prototype.unique = function(field){
+    var n = {},r=[]; //n为hash表，r为临时数组
+    for(var i = 0, len = this.length; i < len; i++){
+        if (!n[this[i][field]]){
+            n[this[i][field]] = true; //存入hash表
+            r.push(this[i][field]); //把当前数组的当前项push到临时数组里面
+        }
+    }
+    return r;
+};
+//普通数组去重
+Array.prototype.unique2 = function()
+{
+    var n = {},r=[]; //n为hash表，r为临时数组
+    for(var i = 0; i < this.length; i++) //遍历当前数组
+    {
+        if (!n[this[i]]) //如果hash表中没有当前项
+        {
+            n[this[i]] = true; //存入hash表
+            r.push(this[i]); //把当前数组的当前项push到临时数组里面
+        }
+    }
+    return r;
+}
 //创建workbook
 function Workbook() {
     if(!(this instanceof Workbook)) return new Workbook();
@@ -33,144 +58,111 @@ function Workbook() {
     this.Sheets = {};
 }
 var XLSX = require('xlsx');
-//配置文件
-var FILED_HIERARCHY = {
-    hieraarchyField: '物理热点(需与小区表中热点名称对应)',
-    disField: '物理热点（名称不可重复）',
-    hotSpotField: '层次关系',
-    detialedInfo: {
-        GSM: '2G小区',
-        TD: '3G小区',
-        LTE: '4G小区'
+
+//新版excel格式
+var CONFIG_NEW = {
+    tableHead: ['小区名称','类型','LAC','CI','经度','纬度','cell_name,cell_nt,lac,ci,lon,lat'],
+    usedCols: {
+        GSM: ['小区中文名','类型','LAC','CI','经度','纬度'],
+        TD: ['小区中文名','类型','LAC','CI','经度','纬度'],
+        LTE: ['小区名称','类型','eNodeBID','CI','经度','纬度']
     },
-    filterField: 'J',
-    doubleLine: 'E',
-    notLine: 'F',
-    fieldObjArr: [
-        {'物理热点（名称不可重复）': 'J'},
-        {'小区名称': 'A'},
-        {'小区类型': ' '},
-        {'LAC': 'B'},
-        {'CI': 'C'},
-        {'经度': 'G'},
-        {'纬度': 'H'},
-        {'方向角': 'E'},
-        {'载频数': 'I'},
-        {'站类型（室内/宏站/应急车）': 'F'}
-    ],
-    disType: '',
-    fieldArr: ['物理热点（名称不可重复）','小区名称',' 小区类型','LAC','CI','经度','纬度','方向角','载频数','基站类型（室内/宏站/应急车）','拼接后'],
+    '类型': {
+        GSM: '2G',
+        TD: '3G',
+        LTE: '4G'
+    },
+    allDis: '区域',
+    path: 'origin-files',
+    fileName: '交通枢纽.xlsx'
 };
-//层次关系
-function readHieraarchy(opts){
+readFileNew(CONFIG_NEW);
+// calculateCount(CONFIG_NEW);
+function readFileNew(opts) {
     var path = opts.path || 'origin-files',
         fileName = opts.fileName;
-        col = opts.colTarget || 'D',
-        rowBegin = opts.rowBegin || 3,
-        rowEnd = opts.rowEnd || 14;
-
     var filePath = path + '/' + fileName;
-    var hotSpotArr = [];
+    //读
     var workbook = XLSX.readFile(filePath);
-    var hieraarchySheet = workbook.Sheets[FILED_HIERARCHY.hotSpotField];
-    for(var i=rowBegin; i<=rowEnd; ++i){
-        if(!hieraarchySheet[col+i]) continue;
-        var hotSpot = hieraarchySheet[col+i].v;
-        if(!hotSpot) continue;
-        hotSpotArr.push(hotSpot);
-    }
-    readDetailedInfo(workbook,hotSpotArr,fileName);
-}
-//获取物理热点下的小区详情数据
-function readDetailedInfo(workbook,arr,fileName){
+    //写
     var wb = new Workbook();
-    arr.map(function(val){
-        var resultArr = [];
-        var disTypeObj = FILED_HIERARCHY.detialedInfo;
-        for(var name in disTypeObj){
-            var disType = disTypeObj[name];
-            var worksheet = workbook.Sheets[disType];
-            FILED_HIERARCHY.fieldObjArr[2]['小区类型'] = disType.substring(0,2);
-            var length = 0;
-            var rowBreak = 0;
-            for(var z in worksheet){
-                var rowNum = z.substring(1);
-                if(rowNum !== rowBreak){
-                    length++;
-                    rowBreak = rowNum;
-                }
-            }
-            //console.log(FILED_HIERARCHY.fieldObjArr[2],length);
-            //取列号
-            var colNumArr = FILED_HIERARCHY.fieldObjArr.map(function(obj){
-                for(var name in obj){
-                    return obj[name];
-                }
-            });
-            //console.log(colNumArr);
-            //取数据
-            for(var i=2; i<length; ++i){
+    var data = [];
+    //取出所有sheet中的数据
+    for(var sheet in workbook.Sheets) {
+        var sheetName = workbook.Sheets[sheet];
+        var fromto = sheetName['!ref'];
+        data = data.concat(XLSX.utils.sheet_to_json(sheetName));
+    }
+
+    //获取所有保障区域名称
+    var allDis = data.map(obj => {
+        return obj[CONFIG_NEW.allDis];
+    });
+    var uniqueDis = allDis.unique2();
+
+    //每个保障区域作为一个sheet
+    uniqueDis.map(val => {
+        var sheetArr = [];
+        for(var sheet in workbook.Sheets) {
+            var sheetName = workbook.Sheets[sheet];
+            var fromto = sheetName['!ref'];
+            var inuse = CONFIG_NEW.usedCols[sheet];
+            var sheetData = XLSX.utils.sheet_to_json(sheetName);
+            sheetData.map(obj => {
+                var allDis = obj[CONFIG_NEW.allDis];
+                if(allDis != val) return;
                 var temArr = [];
                 var temStr = '';
-                var done = false;
-                colNumArr.map(function(field){
-                    if(!worksheet[FILED_HIERARCHY.filterField + i]) return;
-                    //console.log(val,worksheet[FILED_HIERARCHY.filterField + i].v);
-                    if(worksheet[FILED_HIERARCHY.filterField + i].v !== val) return;
-                    if(field.indexOf('2G') !== -1 || field.indexOf('3G') !== -1 ||field.indexOf('4G') !== -1){
-                        temStr += FILED_HIERARCHY.fieldObjArr[2]['小区类型'] + '|';
-                        // if(worksheet[field+i]){
-                            temArr.push(FILED_HIERARCHY.fieldObjArr[2]['小区类型']);
-                        // }
-                        return;
-                    }
-                    if(!worksheet[field+i]) {
-                        return;
-                    }
-
-                    if(field !== FILED_HIERARCHY.filterField){
-                        temStr += worksheet[field+i].v + '|';
-                        if(field === FILED_HIERARCHY.doubleLine){
+                inuse.map(useVal => {
+                    if(!obj[useVal]) {
+                        if(useVal != '类型') {
+                            temArr.push(' ');
                             temStr += '|';
+                        }else{
+                            temArr.push(CONFIG_NEW['类型'][sheet]);
+                            temStr += CONFIG_NEW['类型'][sheet] + '|';
                         }
-                        if(field === FILED_HIERARCHY.notLine){
-                            temStr = temStr.substring(0,temStr.length-1);
-                        }
+                    }else{
+                        temArr.push(obj[useVal]);
+                        temStr += obj[useVal] + '|';
                     }
-                    temArr.push(worksheet[field+i].v);
-                    done = true;
                 });
-                if(done){
-                    temArr.push(temStr);
-                    resultArr.push(temArr);
-                }
-            }
+                temStr = temStr.replace(/\|$/,'');//替换最后一个|
+                temArr.push(temStr);
+                sheetArr.push(temArr);
+            });
         }
-        setSheet(resultArr,val);
+        setSheetNew(sheetArr,val);
     });
-    function setSheet(arr,sheetName){
+
+    function setSheetNew(arr,sheetName){
         //设置表头
-        var tableHead = FILED_HIERARCHY.fieldArr;
-        var data = [tableHead].concat(arr);
-        var ws = sheet_from_array_of_arrays(data);
+        var tableHead = CONFIG_NEW.tableHead;
+        var sheetData = [tableHead].concat(arr);
+
+        var ws = sheet_from_array_of_arrays(sheetData);
         var ws_name = sheetName;
         wb.SheetNames.push(ws_name);
         wb.Sheets[ws_name] = ws;
     }
     XLSX.writeFile(wb, 'processed-files/' + '处理_' + fileName);
+    console.log('save done!');
 }
 
+function calculateCount(opts) {
+    var path = opts.path || 'origin-files',
+        fileName = opts.fileName;
+    var filePath = path + '/' + fileName;
+    //读
+    var workbook = XLSX.readFile(filePath);
 
-var path = 'origin-files',
-    fileName = '-集中性能区域 保障热点小区资源信息表_20160930.xlsx',
-    colTarget = 'D',
-    rowBegin = 3,
-    rowEnd = 14;
-var OPTIONS_CONFIG = {
-    path: path,
-    fileName: fileName,
-    // colTarget: colTarget,
-    // rowBegin: rowBegin,
-    // rowEnd: rowEnd
-};
-readHieraarchy(OPTIONS_CONFIG);
+    var data = [];
+    //取出所有sheet中的数据
+    for(var sheet in workbook.Sheets) {
+        var sheetName = workbook.Sheets[sheet];
+        var fromto = sheetName['!ref'];
+        data = data.concat(XLSX.utils.sheet_to_json(sheetName));
+    }
+    console.log(data.length);
+}
+

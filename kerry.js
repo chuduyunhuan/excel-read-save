@@ -10,7 +10,7 @@
         }
     }
     return r;
-}
+};
 //保存通用函数
 function datenum(v, date1904) {
     if(date1904) v+=1462;
