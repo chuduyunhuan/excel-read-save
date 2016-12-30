@@ -74,7 +74,7 @@ var CONFIG_NEW = {
     },
     allDis: '区域',
     path: 'origin-files',
-    fileName: '交通枢纽.xlsx'
+    fileName: '商业场所(1).xlsx'
 };
 readFileNew(CONFIG_NEW);
 // calculateCount(CONFIG_NEW);
