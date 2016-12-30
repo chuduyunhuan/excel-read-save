@@ -147,10 +147,14 @@ function readFileNew(opts) {
     }
     XLSX.writeFile(wb, 'processed-files/' + '处理_' + fileName);
     console.log('save done!');
+    var originTotalCount = calculateCount(opts),
+        processedTotalCount = calculateCount({fileName: '处理_' + fileName});
+    console.log('原始数据共 ' + originTotalCount + ' 条');
+    console.log('处理后数据共 ' + processedTotalCount + ' 条');
 }
 
 function calculateCount(opts) {
-    var path = opts.path || 'origin-files',
+    var path = opts.path || 'processed-files',
         fileName = opts.fileName;
     var filePath = path + '/' + fileName;
     //读
@@ -163,6 +167,6 @@ function calculateCount(opts) {
         var fromto = sheetName['!ref'];
         data = data.concat(XLSX.utils.sheet_to_json(sheetName));
     }
-    console.log(data.length);
+    return data.length;
 }
 
